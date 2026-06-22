@@ -14,8 +14,6 @@
 #   SUPABASE_KEY=<valor de ANON_KEY abaixo>
 # ─────────────────────────────────────────────────────────────────────────────
 
-version: "3.8"
-
 services:
   # ── Banco de Dados PostgreSQL ───────────────────────────────────────────────
   db:

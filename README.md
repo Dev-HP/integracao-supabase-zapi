@@ -88,23 +88,28 @@ No **SQL Editor** do painel Supabase, execute:
 
 ```sql
 create table if not exists contatos (
-  id         bigint generated always as identity primary key,
-  nome       text not null,
-  telefone   text not null,
+  id bigint generated always as identity primary key,
+  nome text not null,
+  telefone text not null,
+  status_envio text default 'pendente' check (status_envio in ('pendente', 'enviado', 'erro')),
+  enviado_em timestamptz,
+  erro_msg text,
   created_at timestamptz default now()
 );
 
 alter table contatos enable row level security;
 
+-- Remove a política se existir (Idempotência no script)
+drop policy if exists "Leitura pública de contatos" on contatos;
+
 create policy "Leitura pública de contatos"
-  on contatos for select
+  on contatos for all
   using (true);
 
-insert into contatos (nome, telefone) values
-  ('Maria Silva', '5511999999999'),
-  ('João Santos',  '5511888888888'),
-  ('Ana Costa',   '5511777777777');
-```
+insert into contatos (nome, telefone, status_envio) values
+  ('Maria Silva', '5511999999999', 'pendente'),
+  ('João Santos',  '5511888888888', 'pendente'),
+  ('Ana Costa',   '5511777777777', 'pendente');
 
 ### Opção 2: Self-Hosting com Docker *(Diferencial Técnico)*
 
@@ -246,10 +251,9 @@ main.py
     │
     ├── 1. load_settings()           # Carrega e valida .env
     ├── 2. SupabaseContactRepository # Conecta ao Supabase
-    ├── 3. fetch_contacts(limit=3)   # Busca até MAX_CONTACTS contatos
+    ├── 3. fetch_contacts(limit=3)   # Busca apenas contatos com status='pendente'
     ├── 4. ZApiMessagingService      # Instancia provedor de mensagens
     └── 5. Para cada contato:
             ├── build_message(nome)  # "Olá, {nome} tudo bem com você?"
-            ├── send_text_message()  # Envia via Z-API (com retry)
-            └── Registra resultado  # Sucesso / Falha nos logs
-```
+            ├── send_text_message()  # Envia via Z-API (com retry para 5xx)
+            └── mark_sent()          # Atualiza status no banco ('enviado' ou 'erro')
