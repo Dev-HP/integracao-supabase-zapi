@@ -1,5 +1,5 @@
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Protocol
 
 
 @dataclass
@@ -9,9 +9,8 @@ class MessageResult:
     error: str | None = None
 
 
-class MessagingService(ABC):
+class MessagingService(Protocol):
     # interface base — qualquer provedor (Z-API, Twilio...) implementa isso
 
-    @abstractmethod
     def send_text_message(self, phone: str, message: str) -> MessageResult:
-        pass
+        ...
