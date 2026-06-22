@@ -1,0 +1,5 @@
+# ─── Produção ────────────────────────────────────────────────────────────────
+supabase==2.31.0          # Cliente oficial Supabase (REST + Auth + Storage)
+python-dotenv==1.2.1      # Carregamento de variáveis de ambiente via .env
+requests==2.32.5          # HTTP para envio de mensagens via Z-API
+httpx==0.28.1             # HTTP assíncrono (usado internamente pelo supabase-py)

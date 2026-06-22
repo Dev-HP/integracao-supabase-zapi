@@ -1,0 +1,102 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Supabase Self-Hosted via Docker
+# Diferencial técnico: permite rodar o projeto 100% local / on-premise,
+# sem dependência de conta na nuvem — útil em ambientes corporativos com
+# restrições de dados ou para desenvolvimento offline.
+#
+# Uso:
+#   docker-compose up -d
+#   Aguarde ~30s e acesse: http://localhost:3000 (Studio)
+#   API REST:              http://localhost:8000
+#
+# Credenciais padrão (só para dev local — altere antes de ir pra produção!):
+#   SUPABASE_URL=http://localhost:8000
+#   SUPABASE_KEY=<valor de ANON_KEY abaixo>
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.8"
+
+services:
+  # ── Banco de Dados PostgreSQL ───────────────────────────────────────────────
+  db:
+    image: supabase/postgres:15.1.1.78
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── PostgREST — API REST automática sobre o PostgreSQL ─────────────────────
+  rest:
+    image: postgrest/postgrest:v12.2.3
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      PGRST_DB_URI: postgres://postgres:postgres@db:5432/postgres
+      PGRST_DB_SCHEMA: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── Kong — API Gateway (roteador de requisições) ───────────────────────────
+  kong:
+    image: kong:2.8.1
+    restart: unless-stopped
+    ports:
+      - "8000:8000"  # API pública
+      - "8443:8443"  # API pública (HTTPS)
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: bundled
+    volumes:
+      - ./supabase/kong.yml:/var/lib/kong/kong.yml:ro
+    depends_on:
+      - rest
+
+  # ── Supabase Studio — Interface de administração ───────────────────────────
+  studio:
+    image: supabase/studio:20240101-ce42139
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      SUPABASE_URL: http://kong:8000
+      STUDIO_PG_META_URL: http://meta:8080
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTYxMzUzMTk4NSwiZXhwIjoxOTI5MTA3OTg1fQ.ReEThKB9sHKJOoSgIVpRrmMkUNrGkrEO8aKWLimhvMo
+    depends_on:
+      - kong
+
+  # ── Meta — Gerenciador de metadados do banco ───────────────────────────────
+  meta:
+    image: supabase/postgres-meta:v0.80.0
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: postgres
+      PG_META_DB_PASSWORD: postgres
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:

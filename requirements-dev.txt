@@ -1,0 +1,9 @@
+# ─── Desenvolvimento ─────────────────────────────────────────────────────────
+# Instale com: pip install -r requirements-dev.txt
+-r requirements.txt
+
+pytest==9.0.2             # Framework de testes
+pytest-cov==7.0.0         # Relatório de cobertura de testes
+pytest-mock==3.15.1       # Mocks para testes
+black==26.1.0             # Formatador de código (PEP 8)
+flake8==7.3.0             # Linter
