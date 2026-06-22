@@ -15,6 +15,7 @@ class Settings:
     zapi_client_token: str | None
     max_contacts: int
     table_name: str
+    status_column: str
     log_level: str
 
     @property
@@ -32,6 +33,17 @@ def _require(name: str) -> str:
     return value
 
 
+def _require_int(name: str, default: int, minimum: int = 1) -> int:
+    """Lê uma variável de ambiente como inteiro com validação e valor mínimo."""
+    raw = os.getenv(name, str(default)).strip()
+    try:
+        return max(minimum, int(raw))
+    except ValueError:
+        raise ValueError(
+            f"Variável '{name}' deve ser um inteiro, mas recebeu: '{raw}'"
+        )
+
+
 def load_settings() -> Settings:
     return Settings(
         supabase_url=_require("SUPABASE_URL"),
@@ -39,7 +51,8 @@ def load_settings() -> Settings:
         zapi_instance_id=_require("ZAPI_INSTANCE_ID"),
         zapi_token=_require("ZAPI_TOKEN"),
         zapi_client_token=os.getenv("ZAPI_CLIENT_TOKEN", "").strip() or None,
-        max_contacts=max(1, int(os.getenv("MAX_CONTACTS", "3"))),
+        max_contacts=_require_int("MAX_CONTACTS", default=3, minimum=1),
         table_name=os.getenv("TABLE_NAME", "contatos").strip() or "contatos",
+        status_column=os.getenv("STATUS_COLUMN", "status_envio").strip() or "status_envio",
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
     )
