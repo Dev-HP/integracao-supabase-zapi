@@ -58,7 +58,8 @@ class ZApiMessagingService(MessagingService):
 
                 # 5xx = problema do servidor, vale tentar de novo
                 if response.status_code >= 500:
-                    last_error = f"Erro {response.status_code}: {response.text}"
+                    error_body = response.text[:200] if response.text else "(sem corpo)"
+                    last_error = f"Erro {response.status_code}: {error_body}"
                     logger.warning("Servidor Z-API retornou erro: %s", last_error)
                     if attempt < self._max_retries:
                         time.sleep(2 ** (attempt - 1))
@@ -67,6 +68,14 @@ class ZApiMessagingService(MessagingService):
 
                 response.raise_for_status()
                 data = response.json()
+
+                # --- Trava contra o falso positivo da Z-API ---
+                if "error" in data:
+                    error_detail = data.get("message", data.get("error"))
+                    error_msg = f"Erro mascarado na API: {error_detail}"
+                    logger.error("Falha disfarçada de 200 OK para %s: %s", normalized_phone, error_msg)
+                    return MessageResult(success=False, error=error_msg)
+
                 message_id = data.get("messageId") or data.get("zaapId") or data.get("id")
                 logger.debug("Resposta Z-API: %s", data)
                 logger.info("Enviado para %s (id=%s)", normalized_phone, message_id)
@@ -77,7 +86,8 @@ class ZApiMessagingService(MessagingService):
                 status = exc.response.status_code if exc.response is not None else None
                 # 4xx não adianta tentar de novo
                 if status is not None and 400 <= status < 500:
-                    error_msg = f"Erro {status}: {exc.response.text if exc.response else str(exc)}"
+                    error_body = exc.response.text[:200] if exc.response and exc.response.text else str(exc)
+                    error_msg = f"Erro {status}: {error_body}"
                     logger.error("Erro permanente para %s: %s", normalized_phone, error_msg)
                     return MessageResult(success=False, error=error_msg)
                 last_error = str(exc)
@@ -94,4 +104,4 @@ class ZApiMessagingService(MessagingService):
             success=False,
             error=f"Falha após {self._max_retries} tentativas: {last_error}"
         )
-
+    
